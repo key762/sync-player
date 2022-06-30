@@ -1,14 +1,16 @@
 <html lang="zh-cn">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0" />
     <title>sync-player</title>
     <link rel="icon" href="./favicon.png">
     <link rel="stylesheet" href="./style/reset.css">
     <link rel="stylesheet" href="./style/coplay.css">
 </head>
+
 <body>
-<div id="app"></div>
+    <div id="app"></div>
 </body>
 <script src="./script/vue.min.js"></script>
 <script src="./script/socket.io.js"></script>
@@ -18,14 +20,7 @@
     <div class="video-container">
         <div class="video-box">
             <h2 class="video-name"></h2>
-            <video
-                    ref="video"
-                    preload="auto"
-                    controls
-                    controlsList="nofullscreen nodownload noremoteplayback"
-                    style="width: 100% ;height: auto"
-                    playsinline=""
-            >
+            <video ref="video" preload="auto" controls controlsList="nofullscreen nodownload noremoteplayback" style="width: 100% ;height: auto" playsinline="">
 <!--                <source :src="videoSrc" type="video/mp4"/>-->
                 <p class="vjs-no-js">
                     To view this video please enable JavaScript, and consider upgrading to a
@@ -64,18 +59,21 @@
                     </svg>
                 </button>
             </article>
-            <a class="view-btn" href="/movie/">浏览目录</a>
+            <!-- <a class="view-btn" href="/movie/">浏览目录</a> -->
 
             <div class="address-input">
-                <input v-model="videoSrc" type="text" placeholder="视频地址">
-                <a href="javascript:;" class="submit-btn" @click="addVideo">添加视频</a>
+                <Select v-model="videoSrcs" style="width:80%" @change="willVideo($event)">
+                    <Option v-for="item in list" :value="item.name" :key="item.url">{{ item.name }}</Option>
+                </Select>
+                <!-- <input v-model="videoSrc" type="text" placeholder="视频地址"> -->
+                <a href="javascript:;" class="submit-btn" @click="addVideo()">添加视频</a>
             </div>
             <h2 class="video-list-title">视频列表：</h2>
             <ul class="video-list">
-                <li class="video-item" v-for="(videoItem,index) in videoList" :key="index">
-                    <p class="video-name">{{videoItem}}</p>
+                <li class="video-item" v-for="(item,index) in videoList" :key="index">
+                    <p class="video-name">{{item.name}}</p>
                     <div class="button-box">
-                        <a href="javascript:;" class="button-play" @click="playVideoItem(videoItem)">播放</a>
+                        <a href="javascript:;" class="button-play" @click="playVideoItem(item.url)">播放</a>
                         <a href="javascript:;" class="button-play" @click="deleteVideoItem(index)">删除</a>
                     </div>
                 </li>
@@ -85,4 +83,5 @@
 </script>
 <script src="./script/hls.js"></script>
 <script src="./script/main.js"></script>
+
 </html>

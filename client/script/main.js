@@ -1,315 +1,350 @@
 const { Realtime, TextMessage } = AV
 
 const App = new Vue({
-  el: '#app',
-  template: '#template',
-  data: {
-    socket: null,
-    player: null,
-    hls: null,
-    goEasyConnect: null,
-    videoList: [],
-    videoSrc: 'https://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8',
-    playing: false,
-    controlParam: {
-      user: '',
-      action: '',
-      time: '',
-    },
-    userId: '',
-    // goEasy 添加以下变量
-    channel: 'channel1', // GoEasy channel
-    appkey: '******', // GoEasy应用appkey，替换成你的appkey
+    el: '#app',
+    template: '#template',
+    data: {
+        list: [
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/b71df946387702302662442108/v.f100800.mp4", name: "校验视频" },
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/1f8da0b1387702302636188156/v.f100800.mp4", name: "悬崖之上" },
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/6312490a387702302661132891/v.f100800.mp4", name: "好兆头-第一集" },
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/6a80758f387702302661496424/v.f100800.mp4", name: "好兆头-第二集" },
+            { url: "http://1302053227.vod2.myqcloud.com/f4d91e63vodtranscq1302053227/bfdb360d387702302360467770/v.f100800.mp4", name: "好兆头-第三集" },
+            { url: "http://1302053227.vod2.myqcloud.com/f4d91e63vodtranscq1302053227/ab5cbcad387702302339289213/v.f100800.mp4", name: "好兆头-第四集" },
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/65784f28387702302661240079/v.f100800.mp4", name: "好兆头-第五集" },
+            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/73444f87387702302661816303/v.f100800.mp4", name: "好兆头-第六集" },
+        ],
+        socket: null,
+        player: null,
+        hls: null,
+        goEasyConnect: null,
+        videoList: [],
+        videoSrc: 'http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/b71df946387702302662442108/v.f100800.mp4',
+        videoSrcs: '',
+        playing: false,
+        controlParam: {
+            user: '',
+            action: '',
+            time: '',
+        },
+        userId: '',
+        // goEasy 添加以下变量
+        channel: 'channel1', // GoEasy channel
+        appkey: '******', // GoEasy应用appkey，替换成你的appkey
 
-    // leancloud-realtime 添加以下变量，appId、appKey、server这几个值去leancloud控制台>设置>应用凭证里面找
-    chatRoom: null,
-    appId: '*******************',
-    appKey: '*******************',
-    server: 'https://*******************.***.com', // REST API 服务器地址
-  },
-  methods: {
-    randomString(length) {
-      let str = ''
-      for (let i = 0; i < length; i++) {
-        str += Math.random().toString(36).substr(2)
-      }
-      return str.substr(0, length)
+        // leancloud-realtime 添加以下变量，appId、appKey、server这几个值去leancloud控制台>设置>应用凭证里面找
+        chatRoom: null,
+        appId: '*******************',
+        appKey: '*******************',
+        server: 'https://*******************.***.com', // REST API 服务器地址
     },
-    addVideo() {
-      if (this.videoSrc) {
-        this.videoList.push(decodeURI(this.videoSrc))
-      }
-      localStorage.setItem('videoList', JSON.stringify(this.videoList))
-    },
-    playVideoItem(src) {
-      if(src.includes('.m3u8')){
-        this.hls.loadSource(src);
-        this.hls.attachMedia(this.player);
-      } else {
-        this.$refs.video.src = src
-      }
-      localStorage.setItem('currentPlayVideo', src)
+    methods: {
+        randomString(length) {
+            let str = ''
+            for (let i = 0; i < length; i++) {
+                str += Math.random().toString(36).substr(2)
+            }
+            return str.substr(0, length)
+        },
+        willVideo(event) {
+            if (event.target.value) {
+                this.videoSrc = event.target.value
+            } else {
+                this.videoSrc = '校验视频'
+            }
+        },
+        addVideo() {
+            if (this.videoSrc.includes('http')) {
+                this.videoSrc = '校验视频'
+            }
+            var urlTemp = ''
+            this.list.forEach(element => {
+                if (element.name == this.videoSrc) {
+                    urlTemp = element.url
+                }
+            });
+            var flagTemp = true
+            this.videoList.forEach(element => {
+                if (element.name == this.videoSrc) {
+                    flagTemp = false
+                }
+            });
+            if (flagTemp) {
+                if (this.videoSrc) {
+                    this.videoList.push({ 'name': this.videoSrc, url: decodeURI(urlTemp) })
+                }
+                localStorage.setItem('videoList', JSON.stringify(this.videoList))
+            }
+        },
+        playVideoItem(src) {
+            if (src.includes('.m3u8')) {
+                this.hls.loadSource(src);
+                this.hls.attachMedia(this.player);
+            } else {
+                this.$refs.video.src = src
+            }
+            localStorage.setItem('currentPlayVideo', src)
 
-    },
-    deleteVideoItem(index) {
-      this.videoList.splice(index, 1)
-      localStorage.setItem('videoList', JSON.stringify(this.videoList))
-    },
-    toggleFullScreen() {
-      if (this.player.requestFullscreen) {
-        this.player.requestFullscreen()
-      } else if (this.player.mozRequestFullScreen) {
-        this.player.mozRequestFullScreen()
-      } else if (this.player.webkitRequestFullscreen) {
-        this.player.webkitRequestFullscreen()
-      } else if (this.player.msRequestFullscreen) {
-        this.player.msRequestFullscreen()
-      }
-    },
-    playVideo() {
-      if (this.playing) {
-        this.player.pause()
-        this.controlParam.action = 'pause'
-        this.controlParam.time = this.player.currentTime
-        this.sendMessage(this.controlParam)
-      } else {
-        this.player.play()
-        this.controlParam.action = 'play'
-        this.controlParam.time = this.player.currentTime
-        this.sendMessage(this.controlParam)
-      }
-    },
-    seekVideo() {
-      this.player.pause()
-      this.controlParam.action = 'seek'
-      this.controlParam.time = this.player.currentTime
-      this.sendMessage(this.controlParam)
-    },
-    sendMessage(controlParam){
-      const params = JSON.stringify(controlParam)
+        },
+        deleteVideoItem(index) {
+            this.videoList.splice(index, 1)
+            localStorage.setItem('videoList', JSON.stringify(this.videoList))
+        },
+        toggleFullScreen() {
+            if (this.player.requestFullscreen) {
+                this.player.requestFullscreen()
+            } else if (this.player.mozRequestFullScreen) {
+                this.player.mozRequestFullScreen()
+            } else if (this.player.webkitRequestFullscreen) {
+                this.player.webkitRequestFullscreen()
+            } else if (this.player.msRequestFullscreen) {
+                this.player.msRequestFullscreen()
+            }
+        },
+        playVideo() {
+            if (this.playing) {
+                this.player.pause()
+                this.controlParam.action = 'pause'
+                this.controlParam.time = this.player.currentTime
+                this.sendMessage(this.controlParam)
+            } else {
+                this.player.play()
+                this.controlParam.action = 'play'
+                this.controlParam.time = this.player.currentTime
+                this.sendMessage(this.controlParam)
+            }
+        },
+        seekVideo() {
+            this.player.pause()
+            this.controlParam.action = 'seek'
+            this.controlParam.time = this.player.currentTime
+            this.sendMessage(this.controlParam)
+        },
+        sendMessage(controlParam) {
+            const params = JSON.stringify(controlParam)
 
-      // 使用socket-io
-      // this.socket.emit('video-control', params)
+            // 使用socket-io
+            this.socket.emit('video-control', params)
 
-      // 使用GoEasy
-      // this.goEasyConnect.publish({
-      //   channel: this.channel,
-      //   message: params
-      // })
+            // 使用GoEasy
+            // this.goEasyConnect.publish({
+            //   channel: this.channel,
+            //   message: params
+            // })
 
-      // 使用leancloud-realtime
-      this.chatRoom.send(new TextMessage(params))
-    },
-    resultHandler(result) {
-      switch (result.action) {
-        case "play":
-          this.player.currentTime = (result.time + 0.2) //播放时+0.2秒，抵消网络延迟
-          this.player.play();
-          break
-        case "pause":
-          this.player.currentTime = (result.time)
-          this.player.pause();
-          break
-        case "seek":
-          this.player.currentTime = (result.time);
-          break
-      }
-    },
-    // 获取 url 参数
-    getParam(variable) {
-      var query = window.location.search.substring(1);
-      var vars = query.split("&");
-      for (var i = 0; i < vars.length; i++) {
-        var pair = vars[i].split("=");
-        if (pair[0] == variable) {
-          return pair[1];
+            // 使用leancloud-realtime
+            // this.chatRoom.send(new TextMessage(params))
+        },
+        resultHandler(result) {
+            switch (result.action) {
+                case "play":
+                    this.player.currentTime = (result.time + 0.2) //播放时+0.2秒，抵消网络延迟
+                    this.player.play();
+                    break
+                case "pause":
+                    this.player.currentTime = (result.time)
+                    this.player.pause();
+                    break
+                case "seek":
+                    this.player.currentTime = (result.time);
+                    break
+            }
+        },
+        // 获取 url 参数
+        getParam(variable) {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            for (var i = 0; i < vars.length; i++) {
+                var pair = vars[i].split("=");
+                if (pair[0] == variable) {
+                    return pair[1];
+                }
+            }
+            return false;
+        },
+        // 设置 url 参数
+        setParam(param, val) {
+            var stateObject = 0;
+            var title = "0"
+            var oUrl = window.location.href.toString();
+            var nUrl = "";
+            var pattern = param + '=([^&]*)';
+            var replaceText = param + '=' + val;
+            if (oUrl.match(pattern)) {
+                var tmp = '/(' + param + '=)([^&]*)/gi';
+                tmp = oUrl.replace(eval(tmp), replaceText);
+                nUrl = tmp;
+            } else {
+                if (oUrl.match('[\?]')) {
+                    nUrl = oUrl + '&' + replaceText;
+                } else {
+                    nUrl = oUrl + '?' + replaceText;
+                }
+            }
+            history.replaceState(stateObject, title, nUrl);
         }
-      }
-      return false;
     },
-    // 设置 url 参数
-    setParam(param,val){
-      var stateObject = 0;
-      var title="0"
-      var oUrl = window.location.href.toString();
-      var nUrl = "";
-      var pattern=param+'=([^&]*)';
-      var replaceText=param+'='+val; 
-      if(oUrl.match(pattern)){
-          var tmp='/('+ param+'=)([^&]*)/gi';
-          tmp=oUrl.replace(eval(tmp),replaceText);
-          nUrl = tmp;
-      }else{ 
-          if(oUrl.match('[\?]')){ 
-            nUrl = oUrl+'&'+replaceText; 
-          }else{ 
-            nUrl = oUrl+'?'+replaceText; 
-          } 
-      }
-      history.replaceState(stateObject,title,nUrl);
-    }
-  },
-  created() {
+    created() {
 
-    /* 读取本地视频列表和上一次播放的视频*/
+        /* 读取本地视频列表和上一次播放的视频*/
 
-    const localList = JSON.parse(localStorage.getItem('videoList'))
+        const localList = JSON.parse(localStorage.getItem('videoList'))
 
-    this.videoList = localList ? localList : []
+        this.videoList = localList ? localList : []
 
-    const currentPlayVideo = localStorage.getItem('currentPlayVideo')
+        const currentPlayVideo = localStorage.getItem('currentPlayVideo')
 
-    if(currentPlayVideo){
-      this.videoSrc = currentPlayVideo
-    }
+        if (currentPlayVideo) {
+            this.videoSrc = currentPlayVideo
+        }
 
-    if(this.getParam("url")){
-      this.videoSrc = decodeURIComponent(this.getParam("url"))
-    }
+        if (this.getParam("url")) {
+            this.videoSrc = decodeURIComponent(this.getParam("url"))
+        }
 
-    this.userId = this.randomString(10)
+        this.userId = this.randomString(10)
 
-    this.controlParam.user = this.userId
-  },
-  mounted() {
+        this.controlParam.user = this.userId
+    },
+    mounted() {
 
-    this.player = this.$refs.video
+        this.player = this.$refs.video
 
-    if (Hls.isSupported()) {
-      this.hls = new Hls();
-      this.hls.loadSource(this.videoSrc);
-      this.hls.attachMedia(this.player);
-    }
+        if (Hls.isSupported()) {
+            this.hls = new Hls();
+            this.hls.loadSource(this.videoSrc);
+            this.hls.attachMedia(this.player);
+        }
 
-    /*使用socket-io*/
-    // this.socket = io('http://192.168.3.58:2233'); // 替换成你的websocket服务地址
-    // this.socket.on('video-control', (res) => {
-    //   const result = JSON.parse(res);
-    //   if (result.user !== this.userId) {
-    //     this.resultHandler(result)
-    //   }
-    // });
+        /*使用socket-io*/
+        this.socket = io('http://175.178.54.6:2233'); // 替换成你的websocket服务地址
+        this.socket.on('video-control', (res) => {
+            const result = JSON.parse(res);
+            if (result.user !== this.userId) {
+                this.resultHandler(result)
+            }
+        });
 
-    /* 使用GoEasy*/
+        /* 使用GoEasy*/
 
-    // /* 创建GoEasy连接*/
-    // this.goEasyConnect = new GoEasy({
-    //   host: "hangzhou.goeasy.io", // 应用所在的区域地址，杭州：hangzhou.goeasy.io，新加坡：singapore.goeasy.io
-    //   appkey: this.appkey,
-    //   onConnected: function () {
-    //     console.log('连接成功！')
-    //   },
-    //   onDisconnected: function () {
-    //     console.log('连接断开！')
-    //   },
-    //   onConnectFailed: function (error) {
-    //     console.log(error, '连接失败或错误！')
-    //   }
-    // })
-    //
-    const that = this
-    //
-    // /* 监听GoEasy连接*/
-    // this.goEasyConnect.subscribe({
-    //   channel: this.channel,
-    //   onMessage: function (message) {
-    //     const result = JSON.parse(message.content)
-    //     if (result.user !== that.userId) {
-    //       that.resultHandler(result)
-    //     }
-    //   }
-    // })
+        // /* 创建GoEasy连接*/
+        // this.goEasyConnect = new GoEasy({
+        //   host: "hangzhou.goeasy.io", // 应用所在的区域地址，杭州：hangzhou.goeasy.io，新加坡：singapore.goeasy.io
+        //   appkey: this.appkey,
+        //   onConnected: function () {
+        //     console.log('连接成功！')
+        //   },
+        //   onDisconnected: function () {
+        //     console.log('连接断开！')
+        //   },
+        //   onConnectFailed: function (error) {
+        //     console.log(error, '连接失败或错误！')
+        //   }
+        // })
+        //
+        const that = this
+            //
+            // /* 监听GoEasy连接*/
+            // this.goEasyConnect.subscribe({
+            //   channel: this.channel,
+            //   onMessage: function (message) {
+            //     const result = JSON.parse(message.content)
+            //     if (result.user !== that.userId) {
+            //       that.resultHandler(result)
+            //     }
+            //   }
+            // })
 
-    const realtime = new Realtime({
-      appId: this.appId,
-      appKey: this.appKey,
-      server: this.server,
-    })
+        const realtime = new Realtime({
+            appId: this.appId,
+            appKey: this.appKey,
+            server: this.server,
+        })
 
-    //换成你自己的一个房间的 conversation id（这是服务器端生成的），第一次执行代码就会生成，在leancloud控制台>即时通讯>对话下面，复制一个过来即可
+        //换成你自己的一个房间的 conversation id（这是服务器端生成的），第一次执行代码就会生成，在leancloud控制台>即时通讯>对话下面，复制一个过来即可
 
-    var roomId = this.getParam("id")?this.getParam("id"):'***********'
+        var roomId = this.getParam("id") ? this.getParam("id") : '***********'
 
-    // 每个客户端自定义的 id
+        // 每个客户端自定义的 id
 
-    var client, room
+        var client, room
 
-    realtime.createIMClient(this.userId).then(function(c) {
-      console.log('连接成功')
-      client = c
-      client.on('disconnect', function() {
-        console.log('[disconnect] 服务器连接已断开')
-      })
-      client.on('offline', function() {
-        console.log('[offline] 离线（网络连接已断开）')
-      })
-      client.on('online', function() {
-        console.log('[online] 已恢复在线')
-      })
-      client.on('schedule', function(attempt, time) {
-        console.log(
-          '[schedule] ' +
-          time / 1000 +
-          's 后进行第 ' +
-          (attempt + 1) +
-          ' 次重连'
-        )
-      })
-      client.on('retry', function(attempt) {
-        console.log('[retry] 正在进行第 ' + (attempt + 1) + ' 次重连')
-      })
-      client.on('reconnect', function() {
-        console.log('[reconnect] 重连成功')
-      })
-      client.on('reconnecterror', function() {
-        console.log('[reconnecterror] 重连失败')
-      })
-      // 获取对话
-      return c.getConversation(roomId)
-    })
-      .then(function(conversation) {
-        if (conversation) {
-          return conversation
-        } else {
-          // 如果服务器端不存在这个 conversation
-          console.log('不存在这个 conversation，创建一个。')
-          return client
-            .createConversation({
-              name: 'LeanCloud-Conversation',
-              // 创建暂态的聊天室（暂态聊天室支持无限人员聊天）
-              transient: true,
+        realtime.createIMClient(this.userId).then(function(c) {
+                console.log('连接成功')
+                client = c
+                client.on('disconnect', function() {
+                    console.log('[disconnect] 服务器连接已断开')
+                })
+                client.on('offline', function() {
+                    console.log('[offline] 离线（网络连接已断开）')
+                })
+                client.on('online', function() {
+                    console.log('[online] 已恢复在线')
+                })
+                client.on('schedule', function(attempt, time) {
+                    console.log(
+                        '[schedule] ' +
+                        time / 1000 +
+                        's 后进行第 ' +
+                        (attempt + 1) +
+                        ' 次重连'
+                    )
+                })
+                client.on('retry', function(attempt) {
+                    console.log('[retry] 正在进行第 ' + (attempt + 1) + ' 次重连')
+                })
+                client.on('reconnect', function() {
+                    console.log('[reconnect] 重连成功')
+                })
+                client.on('reconnecterror', function() {
+                        console.log('[reconnecterror] 重连失败')
+                    })
+                    // 获取对话
+                return c.getConversation(roomId)
             })
             .then(function(conversation) {
-              roomId = conversation.id
-              console.log('创建新 Room 成功，id 是：', roomId)
-              that.setParam("id", roomId)
-              return conversation
+                if (conversation) {
+                    return conversation
+                } else {
+                    // 如果服务器端不存在这个 conversation
+                    console.log('不存在这个 conversation，创建一个。')
+                    return client
+                        .createConversation({
+                            name: 'LeanCloud-Conversation',
+                            // 创建暂态的聊天室（暂态聊天室支持无限人员聊天）
+                            transient: true,
+                        })
+                        .then(function(conversation) {
+                            roomId = conversation.id
+                            console.log('创建新 Room 成功，id 是：', roomId)
+                            that.setParam("id", roomId)
+                            return conversation
+                        })
+                }
             })
-        }
-      })
-      .then(function(conversation) {
-        return conversation.join()
-      })
-      .then(function(conversation) {
-        // 获取聊天历史
-        room = conversation;
-        that.chatRoom = conversation
-        // 房间接受消息
-        room.on('message', function(message) {
-          const result = JSON.parse(message._lctext)
-          that.resultHandler(result)
-        });
-      })
-      .catch(function(err) {
-        console.error(err);
-        console.log('错误：' + err.message);
-      });
+            .then(function(conversation) {
+                return conversation.join()
+            })
+            .then(function(conversation) {
+                // 获取聊天历史
+                room = conversation;
+                that.chatRoom = conversation
+                    // 房间接受消息
+                room.on('message', function(message) {
+                    const result = JSON.parse(message._lctext)
+                    that.resultHandler(result)
+                });
+            })
+            .catch(function(err) {
+                console.error(err);
+                console.log('错误：' + err.message);
+            });
 
-    this.player.addEventListener('play', () => {
-      this.playing = true
-    })
-    this.player.addEventListener('pause', () => {
-      this.playing = false
-    })
-  }
+        this.player.addEventListener('play', () => {
+            this.playing = true
+        })
+        this.player.addEventListener('pause', () => {
+            this.playing = false
+        })
+    }
 })

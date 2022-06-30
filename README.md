@@ -27,93 +27,373 @@ web版同步效果
 
 # 如何使用：
 
-本项目的核心是websocket，所以至少需要一台服务器提供websocket服务，websocket服务可以自己部署，可以使用第三方平台GoEasy提供的websocket服务(可免费使用两个月)。
+### 部署服务端
 
-1、自己部署：websocket服务器可以是一台具有公网IP的云服务器，也可以是一台具有公网IP的普通PC，没有公网IP也可以。你也可以使用zerotier或其他VPN工具将两台设备组成一个大局域网，让它们能互相通信。websocket服务器操作系统不限，只要有node.js环境。
-
-websocket服务端部署方法：安装node.js环境，将server目录移动到服务器上，进入server目录，执行以下命令
-
-安装项目依赖包
 ```bash
+# 进入服务端文件目录
+cd sync-player/server/
 
 # 安装项目依赖包
-
 npm install 
 
+# 安装node进程管理工具
+npm install forever -g
+
 # 启动websocket服务
-
-node index.js
-
+forever start index.js
 ```
 
-2、使用GoEasy的websocket服务
+### 部署服务端
 
-注册GoEasy开发者账号并创建一个应用，获得appkey，复制到本项目相应位置即可。
+- 使用Nginx将服务器的80端口映射到sync-player/client/目录下的index.html文件
 
-GoEasy官网：https://www.goeasy.io
+- 其次就是在sync-player/client/script/下修改main.js的三处配置即可，一个是下拉框里的视频地址和视频名，以及默认的视频播放地址，最后就是我们的websocket服务端配置
 
-无论是使用哪种websocket服务都可以，本项目写了两套代码，只需将不用的那套注释掉即可(默认GoEasy)。
+  ```js
+  const { Realtime, TextMessage } = AV
+  
+  const App = new Vue({
+      el: '#app',
+      template: '#template',
+      data: {
+          list: [
+              { url: "http://视频播放地址.mp4", name: "视频名称" }
+          ],
+          socket: null,
+          player: null,
+          hls: null,
+          goEasyConnect: null,
+          videoList: [],
+          videoSrc: 'http://默认视频播放地址.mp4',
+          videoSrcs: '',
+          playing: false,
+          controlParam: {
+              user: '',
+              action: '',
+              time: '',
+          },
+          userId: '',
+          // goEasy 添加以下变量
+          channel: 'channel1', // GoEasy channel
+          appkey: '******', // GoEasy应用appkey，替换成你的appkey
+  
+          // leancloud-realtime 添加以下变量，appId、appKey、server这几个值去leancloud控制台>设置>应用凭证里面找
+          chatRoom: null,
+          appId: '*******************',
+          appKey: '*******************',
+          server: 'https://*******************.***.com', // REST API 服务器地址
+      },
+      methods: {
+          randomString(length) {
+              let str = ''
+              for (let i = 0; i < length; i++) {
+                  str += Math.random().toString(36).substr(2)
+              }
+              return str.substr(0, length)
+          },
+          willVideo(event) {
+              if (event.target.value) {
+                  this.videoSrc = event.target.value
+              } else {
+                  this.videoSrc = '校验视频'
+              }
+          },
+          addVideo() {
+              if (this.videoSrc.includes('http')) {
+                  this.videoSrc = '校验视频'
+              }
+              var urlTemp = ''
+              this.list.forEach(element => {
+                  if (element.name == this.videoSrc) {
+                      urlTemp = element.url
+                  }
+              });
+              var flagTemp = true
+              this.videoList.forEach(element => {
+                  if (element.name == this.videoSrc) {
+                      flagTemp = false
+                  }
+              });
+              if (flagTemp) {
+                  if (this.videoSrc) {
+                      this.videoList.push({ 'name': this.videoSrc, url: decodeURI(urlTemp) })
+                  }
+                  localStorage.setItem('videoList', JSON.stringify(this.videoList))
+              }
+          },
+          playVideoItem(src) {
+              if (src.includes('.m3u8')) {
+                  this.hls.loadSource(src);
+                  this.hls.attachMedia(this.player);
+              } else {
+                  this.$refs.video.src = src
+              }
+              localStorage.setItem('currentPlayVideo', src)
+  
+          },
+          deleteVideoItem(index) {
+              this.videoList.splice(index, 1)
+              localStorage.setItem('videoList', JSON.stringify(this.videoList))
+          },
+          toggleFullScreen() {
+              if (this.player.requestFullscreen) {
+                  this.player.requestFullscreen()
+              } else if (this.player.mozRequestFullScreen) {
+                  this.player.mozRequestFullScreen()
+              } else if (this.player.webkitRequestFullscreen) {
+                  this.player.webkitRequestFullscreen()
+              } else if (this.player.msRequestFullscreen) {
+                  this.player.msRequestFullscreen()
+              }
+          },
+          playVideo() {
+              if (this.playing) {
+                  this.player.pause()
+                  this.controlParam.action = 'pause'
+                  this.controlParam.time = this.player.currentTime
+                  this.sendMessage(this.controlParam)
+              } else {
+                  this.player.play()
+                  this.controlParam.action = 'play'
+                  this.controlParam.time = this.player.currentTime
+                  this.sendMessage(this.controlParam)
+              }
+          },
+          seekVideo() {
+              this.player.pause()
+              this.controlParam.action = 'seek'
+              this.controlParam.time = this.player.currentTime
+              this.sendMessage(this.controlParam)
+          },
+          sendMessage(controlParam) {
+              const params = JSON.stringify(controlParam)
+  
+              // 使用socket-io
+              this.socket.emit('video-control', params)
+  
+              // 使用GoEasy
+              // this.goEasyConnect.publish({
+              //   channel: this.channel,
+              //   message: params
+              // })
+  
+              // 使用leancloud-realtime
+              // this.chatRoom.send(new TextMessage(params))
+          },
+          resultHandler(result) {
+              switch (result.action) {
+                  case "play":
+                      this.player.currentTime = (result.time + 0.2) //播放时+0.2秒，抵消网络延迟
+                      this.player.play();
+                      break
+                  case "pause":
+                      this.player.currentTime = (result.time)
+                      this.player.pause();
+                      break
+                  case "seek":
+                      this.player.currentTime = (result.time);
+                      break
+              }
+          },
+          // 获取 url 参数
+          getParam(variable) {
+              var query = window.location.search.substring(1);
+              var vars = query.split("&");
+              for (var i = 0; i < vars.length; i++) {
+                  var pair = vars[i].split("=");
+                  if (pair[0] == variable) {
+                      return pair[1];
+                  }
+              }
+              return false;
+          },
+          // 设置 url 参数
+          setParam(param, val) {
+              var stateObject = 0;
+              var title = "0"
+              var oUrl = window.location.href.toString();
+              var nUrl = "";
+              var pattern = param + '=([^&]*)';
+              var replaceText = param + '=' + val;
+              if (oUrl.match(pattern)) {
+                  var tmp = '/(' + param + '=)([^&]*)/gi';
+                  tmp = oUrl.replace(eval(tmp), replaceText);
+                  nUrl = tmp;
+              } else {
+                  if (oUrl.match('[\?]')) {
+                      nUrl = oUrl + '&' + replaceText;
+                  } else {
+                      nUrl = oUrl + '?' + replaceText;
+                  }
+              }
+              history.replaceState(stateObject, title, nUrl);
+          }
+      },
+      created() {
+  
+          /* 读取本地视频列表和上一次播放的视频*/
+  
+          const localList = JSON.parse(localStorage.getItem('videoList'))
+  
+          this.videoList = localList ? localList : []
+  
+          const currentPlayVideo = localStorage.getItem('currentPlayVideo')
+  
+          if (currentPlayVideo) {
+              this.videoSrc = currentPlayVideo
+          }
+  
+          if (this.getParam("url")) {
+              this.videoSrc = decodeURIComponent(this.getParam("url"))
+          }
+  
+          this.userId = this.randomString(10)
+  
+          this.controlParam.user = this.userId
+      },
+      mounted() {
+  
+          this.player = this.$refs.video
+  
+          if (Hls.isSupported()) {
+              this.hls = new Hls();
+              this.hls.loadSource(this.videoSrc);
+              this.hls.attachMedia(this.player);
+          }
+  
+          /*使用socket-io*/
+          this.socket = io('http://xxx.xxx.xxx.xxx:2233'); // 替换成你的websocket服务地址,即运行服务端的那个服务器ip
+          this.socket.on('video-control', (res) => {
+              const result = JSON.parse(res);
+              if (result.user !== this.userId) {
+                  this.resultHandler(result)
+              }
+          });
+  
+          /* 使用GoEasy*/
+  
+          // /* 创建GoEasy连接*/
+          // this.goEasyConnect = new GoEasy({
+          //   host: "hangzhou.goeasy.io", // 应用所在的区域地址，杭州：hangzhou.goeasy.io，新加坡：singapore.goeasy.io
+          //   appkey: this.appkey,
+          //   onConnected: function () {
+          //     console.log('连接成功！')
+          //   },
+          //   onDisconnected: function () {
+          //     console.log('连接断开！')
+          //   },
+          //   onConnectFailed: function (error) {
+          //     console.log(error, '连接失败或错误！')
+          //   }
+          // })
+          //
+          const that = this
+              //
+              // /* 监听GoEasy连接*/
+              // this.goEasyConnect.subscribe({
+              //   channel: this.channel,
+              //   onMessage: function (message) {
+              //     const result = JSON.parse(message.content)
+              //     if (result.user !== that.userId) {
+              //       that.resultHandler(result)
+              //     }
+              //   }
+              // })
+  
+          const realtime = new Realtime({
+              appId: this.appId,
+              appKey: this.appKey,
+              server: this.server,
+          })
+  
+          //换成你自己的一个房间的 conversation id（这是服务器端生成的），第一次执行代码就会生成，在leancloud控制台>即时通讯>对话下面，复制一个过来即可
+  
+          var roomId = this.getParam("id") ? this.getParam("id") : '***********'
+  
+          // 每个客户端自定义的 id
+  
+          var client, room
+  
+          realtime.createIMClient(this.userId).then(function(c) {
+                  console.log('连接成功')
+                  client = c
+                  client.on('disconnect', function() {
+                      console.log('[disconnect] 服务器连接已断开')
+                  })
+                  client.on('offline', function() {
+                      console.log('[offline] 离线（网络连接已断开）')
+                  })
+                  client.on('online', function() {
+                      console.log('[online] 已恢复在线')
+                  })
+                  client.on('schedule', function(attempt, time) {
+                      console.log(
+                          '[schedule] ' +
+                          time / 1000 +
+                          's 后进行第 ' +
+                          (attempt + 1) +
+                          ' 次重连'
+                      )
+                  })
+                  client.on('retry', function(attempt) {
+                      console.log('[retry] 正在进行第 ' + (attempt + 1) + ' 次重连')
+                  })
+                  client.on('reconnect', function() {
+                      console.log('[reconnect] 重连成功')
+                  })
+                  client.on('reconnecterror', function() {
+                          console.log('[reconnecterror] 重连失败')
+                      })
+                      // 获取对话
+                  return c.getConversation(roomId)
+              })
+              .then(function(conversation) {
+                  if (conversation) {
+                      return conversation
+                  } else {
+                      // 如果服务器端不存在这个 conversation
+                      console.log('不存在这个 conversation，创建一个。')
+                      return client
+                          .createConversation({
+                              name: 'LeanCloud-Conversation',
+                              // 创建暂态的聊天室（暂态聊天室支持无限人员聊天）
+                              transient: true,
+                          })
+                          .then(function(conversation) {
+                              roomId = conversation.id
+                              console.log('创建新 Room 成功，id 是：', roomId)
+                              that.setParam("id", roomId)
+                              return conversation
+                          })
+                  }
+              })
+              .then(function(conversation) {
+                  return conversation.join()
+              })
+              .then(function(conversation) {
+                  // 获取聊天历史
+                  room = conversation;
+                  that.chatRoom = conversation
+                      // 房间接受消息
+                  room.on('message', function(message) {
+                      const result = JSON.parse(message._lctext)
+                      that.resultHandler(result)
+                  });
+              })
+              .catch(function(err) {
+                  console.error(err);
+                  console.log('错误：' + err.message);
+              });
+  
+          this.player.addEventListener('play', () => {
+              this.playing = true
+          })
+          this.player.addEventListener('pause', () => {
+              this.playing = false
+          })
+      }
+  })
+  ```
 
-除了websocket服务器之外，还需要两个http服务端，一个是web服务端(提供html、css、js等文件的访问)，一个是视频服务端(提供视频文件访问)。
+  
 
-3、使用leancloud-realtime
-
-leancloud-realtime是啥玩意？简单来说就是一个即时通讯SDK，这里不多介绍，请去[leancloud官网](https://leancloud.cn/docs/realtime_v2.html) 了解。这个服务也是使用websocket传输数据的，所以本项目也能用，我们只要把传输的文本消息换成一个JSON字符串即可。而且leancloud为开发者提供了一些免费额度，消息数量不限，只有120次/分钟的限制，个人使用的话是完全够用的，强烈推荐这个。
-
-首先注册leancloud开发者账号，进入控制台，获得appId、appKey等信息，复制到对应位置(client/script/main.js)，第一次执行(使用浏览器打开页面)这段代码时会生成一个对话(conversation)，在leancloud控制台>即时通讯>对话下面，复制一个conversation id到对应位置
-
-![TvG1Qs.png](https://s4.ax1x.com/2022/01/05/TvG1Qs.png)
-
-![TvGQzj.png](https://s4.ax1x.com/2022/01/05/TvGQzj.png)
-
-
-你可以将web服务部端署到以下位置：
-
-+ 具有公网IP的服务器
-+ github-pages或国内的码云提供的静态web服务
-+ localhost(本地服务器)，同一个局域网内的设备访问该服务器内网IP
-
-视频文件只需一个视频地址就行，也有以下几种选择：
-
-+ 具有公网IP的服务器
-+ localhost(本地服务器)，同一个局域网内的设备访问该服务器内网IP
-+ 第三方视频地址
-
-![wfntdU.png](https://s1.ax1x.com/2020/09/17/wfntdU.png)
-
-使用场景1：云服务器带宽足够大(至少要大于播放视频的码率)，云服务器既可以作为websocket服务端，也可以作为http服务端。上图中所有设备都访问云服务器的ip或域名。
-
-使用场景2：云服务器的带宽很小，这时候它只能作为websocket服务端，这时可以用上图中的PC1和PC2作为http服务端，PC1和PHONE1在一个内网访问PC1的内网IP，PC2和PHONE2在一个内网访问PC2的内网IP，PC3可作为自己的http服务端，PHONE3若是有提供视频文件的服务端，也可以使用。
-
-![wfnYZT.png](https://s1.ax1x.com/2020/09/17/wfnYZT.png)
-
-使用场景3：需要使用zerotier或其他VPN工具将异地设备组成一个大局域网，其中任意一台PC均可作为websocket服务端和http服务端(需要上传带宽足够大)。上图中各设备都访问那台PC的内网ip即可。
-
-最简单的使用方法，下载nginx开启一个本地服务器，下载本项目client文件夹放到到nginx根目录里，视频文件也放到里面。注册leancloud开发者账号并创建一个应用，获得appId、appKey等信息，并填入到代码(`script/main.js`)相应位置。然后浏览器打开 `192.168.3.58/client/`，填入你的视频地址`192.168.3.58/movie/xxx.mp4`或网络视频地址，对方也这样操作一番，即可实现同步播放视频。
-
-web版本的功能比较简单，而且受限于网络问题，快进之类的操作需要缓冲一段时间。如果你不满足web版功能，对用户体验有更高的要求，如支持更多文件格式、播放高清本地视频文件、外挂字幕等，我也找到了另一种方式来满足你的需求。
-
-那就是DIY一个开源的播放器的源码：SPlayer(射手影音)。
-
-射手影音官网：https://splayer.org
-
-源码地址：https://github.com/chiflix/splayerx
-
-在以**electron + 播放器**为关键字一番搜索之后，我找到了这个基于electron实现的开源播放器，并下载了源码来研究。
-
-经过一番研究之后，我找到了控制视频播放、暂停、快进的代码位置，并将控制同步的代码移植了进去，从而也实现了同步功能，并且与web版兼容。
-
-具体方法请看：[修改教程](how-to-modify-splayer.md)
-
-PS：射手影音官方的代码打包之后会有一个bug，窗口无法拖动，我自己fork了一个分支，修正了这个bug，控制同步的代码也都加进去了，需要的可以直接fork，修改一下appKey即可，地址：https://github.com/liyang5945/splayerx
-
-
-本项目部分图标样式来源于此项目: [coplay](https://github.com/Justineo/coplay) 
-
-## 更新记录
-
-2022-01-05
-- 添加leancloud即时通讯方案、完善修改射手影音的教程。
-
-2022-01-18
-- 添加m3u8视频支持。
