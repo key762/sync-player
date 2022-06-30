@@ -2,17 +2,9 @@
 # 功能介绍&特性：
 
 一个可以同步看视频的播放器，可用于异地同步观影、观剧，支持多人同时观看。
-本项目有两个版本，web版运行在浏览器上，可跨平台，不限操作系统、设备，功能简单适用于要求不高的用户。还有基于SPlayer(射手影音)DIY的客户端版本(windows、MAC)，播放4K高清文件、外挂字幕，统统没问题。
 
 # 演示demo:
-
-web版同步效果
-
-![wI60je.gif](https://s1.ax1x.com/2020/09/19/wI60je.gif)
-
-客户端与web版同步效果
-
-![wofbYd.gif](https://s1.ax1x.com/2020/09/20/wofbYd.gif)
+![image](https://user-images.githubusercontent.com/95260477/176601421-5197c376-39b2-4bfe-af86-94f83feb3897.png)
 
 
 # 原理：
