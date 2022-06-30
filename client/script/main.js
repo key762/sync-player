@@ -5,21 +5,14 @@ const App = new Vue({
     template: '#template',
     data: {
         list: [
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/b71df946387702302662442108/v.f100800.mp4", name: "校验视频" },
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/1f8da0b1387702302636188156/v.f100800.mp4", name: "悬崖之上" },
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/6312490a387702302661132891/v.f100800.mp4", name: "好兆头-第一集" },
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/6a80758f387702302661496424/v.f100800.mp4", name: "好兆头-第二集" },
-            { url: "http://1302053227.vod2.myqcloud.com/f4d91e63vodtranscq1302053227/bfdb360d387702302360467770/v.f100800.mp4", name: "好兆头-第三集" },
-            { url: "http://1302053227.vod2.myqcloud.com/f4d91e63vodtranscq1302053227/ab5cbcad387702302339289213/v.f100800.mp4", name: "好兆头-第四集" },
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/65784f28387702302661240079/v.f100800.mp4", name: "好兆头-第五集" },
-            { url: "http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/73444f87387702302661816303/v.f100800.mp4", name: "好兆头-第六集" },
+            { url: "http://视频播放地址.mp4", name: "视频名称" }
         ],
         socket: null,
         player: null,
         hls: null,
         goEasyConnect: null,
         videoList: [],
-        videoSrc: 'http://1302053227.vod2.myqcloud.com/53cc952avodtranssh1302053227/b71df946387702302662442108/v.f100800.mp4',
+        videoSrc: 'http://默认视频播放地址.mp4',
         videoSrcs: '',
         playing: false,
         controlParam: {
@@ -217,7 +210,7 @@ const App = new Vue({
         }
 
         /*使用socket-io*/
-        this.socket = io('http://175.178.54.6:2233'); // 替换成你的websocket服务地址
+        this.socket = io('http://xxx.xxx.xxx.xxx:2233'); // 替换成你的websocket服务地址,即运行服务端的那个服务器ip
         this.socket.on('video-control', (res) => {
             const result = JSON.parse(res);
             if (result.user !== this.userId) {
